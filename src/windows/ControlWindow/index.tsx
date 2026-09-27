@@ -14,7 +14,7 @@ import getVerseByReference from "../../utils/getVerseByReference";
 const CAPTION_WINDOW = 'caption-window'
 
 function formatReferenceQuery(ref: VerseReference) {
-  return `${ref.book} ${ref.chapter}:${ref.verse}`;
+  return `${ABBR_TO_BOOK[ref.book]} ${ref.chapter}:${ref.verse}`;
 }
 
 export default function ControlWindow() {
