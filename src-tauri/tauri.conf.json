@@ -19,7 +19,8 @@
         "resizable": false,
         "maximizable": false,
         "x": 720,
-        "y": 480
+        "y": 480,
+        "closable": true
       }
     ],
     "security": {

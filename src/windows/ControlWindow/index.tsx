@@ -1,4 +1,5 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./style.css"
 import { useAppState } from "../../contexts/VerseReferenceContext";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -28,9 +29,10 @@ export default function ControlWindow() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
-  // Trava contra criações concorrentes: enquanto uma checagem/criação
-  // estiver em andamento, novas chamadas de ensureCaptionWindow são ignoradas.
   const isEnsuringCaptionWindow = useRef(false);
+  // Evita reentrância: se o handler de close for chamado de novo
+  // enquanto já estamos fechando, não tentamos fechar a legenda 2x.
+  const isClosingApp = useRef(false);
 
   const isPaused = reference === null && pausedReference !== null;
 
@@ -44,8 +46,6 @@ export default function ControlWindow() {
     });
   }, [selectedIndex, results]);
 
-  // Garante que exista sempre uma (e só uma) janela de legenda aberta.
-  // Se ela já existir, apenas confirma o estado; caso contrário, cria.
   async function ensureCaptionWindow() {
     if (isEnsuringCaptionWindow.current) {
       return;
@@ -85,9 +85,6 @@ export default function ControlWindow() {
         });
       });
 
-      // Assim que a janela for fechada (por qualquer motivo), marcamos
-      // isCaptionOpen como false; a próxima mudança de reference vai
-      // recriá-la através deste mesmo ensureCaptionWindow.
       captionWindow.once('tauri://destroyed', () => {
         setIsCaptionOpen(false);
       });
@@ -96,17 +93,49 @@ export default function ControlWindow() {
     }
   }
 
-  // Abre a legenda junto com o programa.
   useEffect(() => {
     ensureCaptionWindow();
   }, []);
 
-  // A cada mudança de reference: envia o valor para a legenda e garante
-  // que a janela dela ainda existe (recriando se necessário).
   useEffect(() => {
     invoke('set_valor', { reference: JSON.stringify(reference) });
     ensureCaptionWindow();
   }, [reference])
+
+  // Ao fechar a janela principal, fecha também a de legenda antes de
+  // permitir que o processo/app termine.
+  useEffect(() => {
+    const mainWindow = getCurrentWindow();
+    let unlisten: (() => void) | undefined;
+
+    mainWindow.onCloseRequested(async (event) => {
+      if (isClosingApp.current) {
+        return;
+      }
+      isClosingApp.current = true;
+
+      // Impede o fechamento imediato da principal para dar tempo
+      // de fechar a legenda de forma coordenada.
+      event.preventDefault();
+
+      try {
+        const captionWindow = await WebviewWindow.getByLabel(CAPTION_WINDOW);
+        if (captionWindow) {
+          await captionWindow.close();
+        }
+      } catch (e) {
+        console.error('Erro ao fechar janela de legenda:', e);
+      } finally {
+        await mainWindow.destroy();
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   function handleVerseSearch(event: ChangeEvent<HTMLInputElement>) {
     const value = event.target.value;
@@ -153,14 +182,6 @@ export default function ControlWindow() {
     setSelectedIndex(0);
   }
 
-  function handleGoToAdjacent(direction: 'prev' | 'next') {
-    if (isPaused) {
-      handleGoToAdjacentPausedVerse(direction);
-    } else {
-      handleGoToAdjacentVerse(direction);
-    }
-  }
-
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     switch (event.key) {
       case "ArrowDown":
@@ -175,11 +196,19 @@ export default function ControlWindow() {
         break;
       case "ArrowLeft":
         event.preventDefault();
-        handleGoToAdjacent('prev');
+        if (isPaused) {
+          handleGoToAdjacentPausedVerse('prev');
+        } else {
+          handleGoToAdjacentVerse('prev');
+        }
         break;
       case "ArrowRight":
         event.preventDefault();
-        handleGoToAdjacent('next');
+        if (isPaused) {
+          handleGoToAdjacentPausedVerse('next');
+        } else {
+          handleGoToAdjacentVerse('next');
+        }
         break;
       case "Enter":
         if (results.length === 0) return;
@@ -243,8 +272,8 @@ export default function ControlWindow() {
       </div>
       <div className="control-container">
         <div>
-          <button onClick={() => handleGoToAdjacent('prev')}><ChevronLeft /></button>
-          <button onClick={() => handleGoToAdjacent('next')}><ChevronRight /></button>
+          <button onClick={() => handleGoToAdjacentVerse('prev')}><ChevronLeft /></button>
+          <button onClick={() => handleGoToAdjacentVerse('next')}><ChevronRight /></button>
         </div>
         <div className="verse-preview">
           <span>{
