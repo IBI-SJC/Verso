@@ -39,7 +39,7 @@ body {
 
 .input-container {
   display: flex;
-  padding-top: 50px;
+  padding-top: 30px;
   flex-direction: column;
   align-items: center;
   background-color: var(--obs-panel);
@@ -54,8 +54,7 @@ body {
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-rows: 20% 50% 30%;
-  gap: 8px;
+  grid-template-rows: 30% 70%;
   place-items: center;
   background-color: var(--obs-panel);
 }
@@ -189,5 +188,5 @@ input[type="text"]:focus {
   margin: 0;
   margin-top: 10px;
   overflow-y: auto;
-  max-height: 160px;
+  max-height: 100px;
 }

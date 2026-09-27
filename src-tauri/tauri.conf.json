@@ -15,7 +15,11 @@
         "title": "versiculos-livestream",
         "width": 800,
         "height": 300,
-        "alwaysOnTop": true
+        "alwaysOnTop": true,
+        "resizable": false,
+        "maximizable": false,
+        "x": 720,
+        "y": 480
       }
     ],
     "security": {

@@ -13,18 +13,27 @@ import getVerseByReference from "../../utils/getVerseByReference";
 
 const CAPTION_WINDOW = 'caption-window'
 
+function formatReferenceQuery(ref: VerseReference) {
+  return `${ref.book} ${ref.chapter}:${ref.verse}`;
+}
+
 export default function ControlWindow() {
-  const { reference, isCaptionOpen, setReference, setIsCaptionOpen } = useAppState()
+  const { reference, setReference, setIsCaptionOpen } = useAppState()
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<VerseReference[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [history, setHistory] = useState<Array<VerseReference>>([])
+  const [pausedReference, setPausedReference] = useState<VerseReference | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
+  // Trava contra criações concorrentes: enquanto uma checagem/criação
+  // estiver em andamento, novas chamadas de ensureCaptionWindow são ignoradas.
+  const isEnsuringCaptionWindow = useRef(false);
 
-  // Mantém o input sempre em foco ao montar o componente
+  const isPaused = reference === null && pausedReference !== null;
+
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -35,53 +44,82 @@ export default function ControlWindow() {
     });
   }, [selectedIndex, results]);
 
-  useEffect(() => {
-    console.log()
-    invoke('set_valor', { reference: JSON.stringify(reference) });
-  }, [reference])
-
-  function openCaptionWindow() {
-    const captionWindow = new WebviewWindow(CAPTION_WINDOW, {
-      url: '/caption',
-      title: 'Exibição de versículo',
-      width: 1400,
-      height: 300,
-      decorations: false,
-      transparent: true,
-      shadow: false,
-    });
-
-    captionWindow.setAlwaysOnBottom(true);
-
-    captionWindow.once('tauri://created', () => {
-      console.log('Janela criada com sucesso');
-      setIsCaptionOpen(true)
-    });
-
-    captionWindow.once('tauri://error', (e) => {
-      console.error('Erro ao criar janela:', e);
-    });
-  }
-
-  async function closeCaptionWindow() {
-    const captionWindow = await WebviewWindow.getByLabel(CAPTION_WINDOW)
-
-    if (!captionWindow) {
-      return
+  // Garante que exista sempre uma (e só uma) janela de legenda aberta.
+  // Se ela já existir, apenas confirma o estado; caso contrário, cria.
+  async function ensureCaptionWindow() {
+    if (isEnsuringCaptionWindow.current) {
+      return;
     }
 
-    await captionWindow.close()
-    setIsCaptionOpen(false)
+    isEnsuringCaptionWindow.current = true;
+
+    try {
+      const existing = await WebviewWindow.getByLabel(CAPTION_WINDOW);
+      if (existing) {
+        setIsCaptionOpen(true);
+        return;
+      }
+
+      const captionWindow = new WebviewWindow(CAPTION_WINDOW, {
+        url: '/caption',
+        title: 'Exibição de versículo',
+        width: 1400,
+        height: 300,
+        decorations: false,
+        transparent: true,
+        shadow: false,
+      });
+
+      captionWindow.setAlwaysOnBottom(true);
+
+      await new Promise<void>((resolve) => {
+        captionWindow.once('tauri://created', () => {
+          console.log('Janela de legenda criada com sucesso');
+          setIsCaptionOpen(true);
+          resolve();
+        });
+
+        captionWindow.once('tauri://error', (e) => {
+          console.error('Erro ao criar janela de legenda:', e);
+          resolve();
+        });
+      });
+
+      // Assim que a janela for fechada (por qualquer motivo), marcamos
+      // isCaptionOpen como false; a próxima mudança de reference vai
+      // recriá-la através deste mesmo ensureCaptionWindow.
+      captionWindow.once('tauri://destroyed', () => {
+        setIsCaptionOpen(false);
+      });
+    } finally {
+      isEnsuringCaptionWindow.current = false;
+    }
   }
+
+  // Abre a legenda junto com o programa.
+  useEffect(() => {
+    ensureCaptionWindow();
+  }, []);
+
+  // A cada mudança de reference: envia o valor para a legenda e garante
+  // que a janela dela ainda existe (recriando se necessário).
+  useEffect(() => {
+    invoke('set_valor', { reference: JSON.stringify(reference) });
+    ensureCaptionWindow();
+  }, [reference])
 
   function handleVerseSearch(event: ChangeEvent<HTMLInputElement>) {
     const value = event.target.value;
     setQuery(value);
 
+    if (pausedReference) {
+      setPausedReference(null);
+    }
+
     const found = searchVerse(value, ACF as Bible, history);
 
     setResults(found);
-    setSelectedIndex(0); // sempre volta o cursor da lista para o topo
+    setSelectedIndex(0);
   }
 
   function handleGoToAdjacentVerse(direction: 'prev' | 'next') {
@@ -97,33 +135,69 @@ export default function ControlWindow() {
     setReference(newVerse)
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (results.length === 0) return;
+  function handleGoToAdjacentPausedVerse(direction: 'prev' | 'next') {
+    if (!pausedReference) {
+      return
+    }
 
+    const newVerse = getAdjacentVerse(ACF as Bible, pausedReference, direction)
+    if (!newVerse) {
+      return
+    }
+
+    setPausedReference(newVerse)
+
+    const newQuery = formatReferenceQuery(newVerse);
+    setQuery(newQuery);
+    setResults(searchVerse(newQuery, ACF as Bible, history));
+    setSelectedIndex(0);
+  }
+
+  function handleGoToAdjacent(direction: 'prev' | 'next') {
+    if (isPaused) {
+      handleGoToAdjacentPausedVerse(direction);
+    } else {
+      handleGoToAdjacentVerse(direction);
+    }
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     switch (event.key) {
       case "ArrowDown":
+        if (results.length === 0) return;
         event.preventDefault();
         setSelectedIndex((prev) => (prev + 1) % results.length);
         break;
       case "ArrowUp":
+        if (results.length === 0) return;
         event.preventDefault();
         setSelectedIndex((prev) => (prev - 1 + results.length) % results.length);
         break;
       case "ArrowLeft":
         event.preventDefault();
-        handleGoToAdjacentVerse('prev');
+        handleGoToAdjacent('prev');
         break;
       case "ArrowRight":
         event.preventDefault();
-        handleGoToAdjacentVerse('next');
+        handleGoToAdjacent('next');
         break;
       case "Enter":
+        if (results.length === 0) return;
         event.preventDefault();
         setReference(results[selectedIndex]);
         setHistory([...history, results[selectedIndex]])
-        inputRef.current?.select(); // seleciona todo o texto do input
+        inputRef.current?.select();
         break;
       case "Escape":
+        event.preventDefault();
+        if (reference) {
+          setPausedReference(reference);
+
+          const newQuery = formatReferenceQuery(reference);
+          setQuery(newQuery);
+          setResults(searchVerse(newQuery, ACF as Bible, history));
+          setSelectedIndex(0);
+        }
         setReference(null);
         break;
       default:
@@ -169,22 +243,25 @@ export default function ControlWindow() {
       </div>
       <div className="control-container">
         <div>
-          <button onClick={() => handleGoToAdjacentVerse('prev')}><ChevronLeft /></button>
-          <button onClick={() => handleGoToAdjacentVerse('next')}><ChevronRight /></button>
+          <button onClick={() => handleGoToAdjacent('prev')}><ChevronLeft /></button>
+          <button onClick={() => handleGoToAdjacent('next')}><ChevronRight /></button>
         </div>
         <div className="verse-preview">
-          <span>{reference ? 'Próximo versículo:' : (results.length ? 'Versículo selecionado:' : '')}</span>
+          <span>{
+            reference
+              ? 'Próximo versículo:'
+              : isPaused
+                ? 'Versículo pausado:'
+                : (results.length ? 'Versículo selecionado:' : '')
+          }</span>
           <p>{
             reference
               ? getVerseByReference(ACF as Bible, getAdjacentVerse(ACF as Bible, reference, 'next'))
-              : getVerseByReference(ACF as Bible, results[selectedIndex])
+              : isPaused
+                ? getVerseByReference(ACF as Bible, pausedReference)
+                : getVerseByReference(ACF as Bible, results[selectedIndex])
           }</p>
         </div>
-        {
-          isCaptionOpen
-            ? <button onClick={closeCaptionWindow}>Fechar legenda</button>
-            : <button onClick={openCaptionWindow}>Abrir legenda</button>
-        }
       </div>
     </main>
   );
