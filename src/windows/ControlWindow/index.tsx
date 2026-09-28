@@ -214,7 +214,7 @@ export default function ControlWindow() {
         if (results.length === 0) return;
         event.preventDefault();
         setReference(results[selectedIndex]);
-        setHistory([...history, results[selectedIndex]])
+        setHistory([results[selectedIndex], ...history])
         inputRef.current?.select();
         break;
       case "Escape":
