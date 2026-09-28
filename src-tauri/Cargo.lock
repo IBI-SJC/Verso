@@ -4104,7 +4104,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "versiculos-livestream"
+name = "Verso"
 version = "0.1.0"
 dependencies = [
  "serde",
