@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "versiculos-livestream",
+        "title": "Verso",
         "width": 800,
         "height": 300,
         "alwaysOnTop": true,
