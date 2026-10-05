@@ -13,7 +13,19 @@ A janela de legenda abre junto com o programa, é recriada automaticamente caso 
 
 ### Pesquisa de versículos
 
-Digite a referência no campo de busca e uma lista de resultados aparece abaixo do campo. Use `↑` e `↓` para escolher um resultado (ou clique nele) e `Enter` para exibi-lo na legenda. A prévia do versículo selecionado é mostrada na janela de controle antes de ir ao ar.
+Digite a referência no campo de busca e uma lista de resultados aparece abaixo do campo. A pesquisa foi pensada para ser dinâmica e ágil, permitindo tanto a digitação da referência no formato tradicional quanto formas abreviadas, facilitando a busca durante uma leitura ou pregação.
+
+Por exemplo, referências podem ser pesquisadas normalmente:
+
+- `1 Samuel 15:22`
+- `Efésios 2:8`
+
+Mas também é possível utilizar formas mais rápidas e compactas:
+
+- `1co13 1` → 1 Coríntios 13:1
+- `gn1 1` → Gênesis 1:1
+
+Use `↑` e `↓` para escolher um resultado (ou clique nele) e `Enter` para exibi-lo na legenda. A prévia do versículo selecionado é mostrada na janela de controle antes de ir ao ar.
 
 ![](./.github/images/pesquisa.gif)
 
