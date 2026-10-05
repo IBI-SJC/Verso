@@ -69,6 +69,10 @@ export default function ControlWindow() {
     }
 
     setQuery(formatReferenceQuery(reference))
+
+    setTimeout(() => {
+      inputRef.current?.select();
+    }, 10)
   }, [reference])
 
   useEffect(() => {
@@ -80,13 +84,11 @@ export default function ControlWindow() {
     setQuery(newQuery)
     setResults(searchVerse(newQuery, ACF as Bible, history));
     setSelectedIndex(0)
-  }, [pausedReference])
 
-  useEffect(() => {
     setTimeout(() => {
       inputRef.current?.select();
     }, 10)
-  }, [reference, pausedReference])
+  }, [pausedReference])
 
   function handleVerseSearch(event: ChangeEvent<HTMLInputElement>) {
     const value = event.target.value;
