@@ -152,12 +152,18 @@ export default function ControlWindow() {
   }
 
   function handleGoToAdjacentVerse(direction: 'prev' | 'next') {
-    if(!reference) {
+    if(!reference && !results.length) {
+      return
+    }
+    const newVerse = getAdjacentVerse(ACF as Bible, reference ?? results[selectedIndex], direction)
+
+    if(!newVerse) {
       return
     }
 
-    const newVerse = getAdjacentVerse(ACF as Bible, reference, direction)
-    if(!newVerse) {
+    if(!reference) {
+      setPausedReference(newVerse)
+      setQuery(formatReferenceQuery(newVerse))
       return
     }
 
