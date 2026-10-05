@@ -6,13 +6,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import searchVerse from "../../utils/searchVerse";
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { Bible, VerseReference } from "../../types";
-import { ABBR_TO_BOOK } from "../../constants";
+import { ABBR_TO_BOOK, CAPTION_WINDOW } from "../../constants";
 import { invoke } from "@tauri-apps/api/core";
 import getAdjacentVerse from "../../utils/getAdjacentVerse";
 import ACF from "../../acf.json"
 import getVerseByReference from "../../utils/getVerseByReference";
-
-const CAPTION_WINDOW = 'caption-window'
+import ensureCaptionWindow from "../../utils/ensureCaptionWindow";
 
 function formatReferenceQuery(ref: VerseReference) {
   return `${ABBR_TO_BOOK[ref.book]} ${ref.chapter}:${ref.verse}`;
@@ -36,75 +35,13 @@ export default function ControlWindow() {
 
   const isPaused = reference === null && pausedReference !== null;
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    itemRefs.current[selectedIndex]?.scrollIntoView({
-      block: "nearest",
-    });
-  }, [selectedIndex, results]);
-
-  async function ensureCaptionWindow() {
-    if (isEnsuringCaptionWindow.current) {
-      return;
-    }
-
-    isEnsuringCaptionWindow.current = true;
-
-    try {
-      const existing = await WebviewWindow.getByLabel(CAPTION_WINDOW);
-      if (existing) {
-        setIsCaptionOpen(true);
-        return;
-      }
-
-      const captionWindow = new WebviewWindow(CAPTION_WINDOW, {
-        url: '/caption',
-        title: 'Exibição de versículo',
-        width: 1400,
-        height: 500,
-        decorations: false,
-        transparent: true,
-        shadow: false,
-      });
-
-      captionWindow.setAlwaysOnBottom(true);
-
-      await new Promise<void>((resolve) => {
-        captionWindow.once('tauri://created', () => {
-          console.log('Janela de legenda criada com sucesso');
-          setIsCaptionOpen(true);
-          resolve();
-        });
-
-        captionWindow.once('tauri://error', (e) => {
-          console.error('Erro ao criar janela de legenda:', e);
-          resolve();
-        });
-      });
-
-      captionWindow.once('tauri://destroyed', () => {
-        setIsCaptionOpen(false);
-      });
-    } finally {
-      isEnsuringCaptionWindow.current = false;
-    }
-  }
-
-  useEffect(() => {
-    ensureCaptionWindow();
-  }, []);
-
-  useEffect(() => {
-    invoke('set_valor', { reference: JSON.stringify(reference) });
-    ensureCaptionWindow();
-  }, [reference])
-
   // Ao fechar a janela principal, fecha também a de legenda antes de
   // permitir que o processo/app termine.
   useEffect(() => {
+    inputRef.current?.focus();
+
+    ensureCaptionWindow(isEnsuringCaptionWindow, setIsCaptionOpen);
+  
     const mainWindow = getCurrentWindow();
     let unlisten: (() => void) | undefined;
 
@@ -137,6 +74,40 @@ export default function ControlWindow() {
     };
   }, []);
 
+  useEffect(() => {
+    itemRefs.current[selectedIndex]?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [selectedIndex, results]);
+
+  useEffect(() => {
+    invoke('set_valor', { reference: JSON.stringify(reference) });
+    ensureCaptionWindow(isEnsuringCaptionWindow, setIsCaptionOpen);
+
+    if(!reference) {
+      return
+    }
+
+    setQuery(formatReferenceQuery(reference))
+  }, [reference])
+
+  useEffect(() => {
+    if(!pausedReference) {
+      return
+    }
+    const newQuery = formatReferenceQuery(pausedReference)
+
+    setQuery(newQuery)
+    setResults(searchVerse(newQuery, ACF as Bible, history));
+    setSelectedIndex(0)
+  }, [pausedReference])
+
+  useEffect(() => {
+    setTimeout(() => {
+      inputRef.current?.select();
+    }, 10)
+  }, [reference, pausedReference])
+
   function handleVerseSearch(event: ChangeEvent<HTMLInputElement>) {
     const value = event.target.value;
     setQuery(value);
@@ -163,7 +134,6 @@ export default function ControlWindow() {
 
     if(!reference) {
       setPausedReference(newVerse)
-      setQuery(formatReferenceQuery(newVerse))
       return
     }
 
@@ -181,11 +151,6 @@ export default function ControlWindow() {
     }
 
     setPausedReference(newVerse)
-
-    const newQuery = formatReferenceQuery(newVerse);
-    setQuery(newQuery);
-    setResults(searchVerse(newQuery, ACF as Bible, history));
-    setSelectedIndex(0);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -227,11 +192,8 @@ export default function ControlWindow() {
         event.preventDefault();
         if (reference) {
           setPausedReference(reference);
-
           const newQuery = formatReferenceQuery(reference);
-          setQuery(newQuery);
           setResults(searchVerse(newQuery, ACF as Bible, history));
-          setSelectedIndex(0);
         }
         setReference(null);
         break;

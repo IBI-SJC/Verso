@@ -205,3 +205,5 @@ export const ABBR_TO_BOOK: Record<BookAbbr, string> = {
 }
 
 export const REFERENCE_EVENT = 'reference-event'
+
+export const CAPTION_WINDOW = 'caption-window'
