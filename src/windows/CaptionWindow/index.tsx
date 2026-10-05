@@ -55,7 +55,9 @@
                 <div className="caption-inner">
                     {displayReference && (
                         <>
-                            <div className="verse-text">{getVerseByReference(ACF as Bible, displayReference)}</div>
+                            <div className="verse-text text-container">
+                                <p className="dynamic-text">{getVerseByReference(ACF as Bible, displayReference)}</p>
+                            </div>
                             <div className="verse-address">{ABBR_TO_BOOK[displayReference.book]} {displayReference.chapter}:{displayReference.verse} (ACF)</div>
                         </>
                     )}

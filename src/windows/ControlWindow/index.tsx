@@ -64,7 +64,7 @@ export default function ControlWindow() {
         url: '/caption',
         title: 'Exibição de versículo',
         width: 1400,
-        height: 300,
+        height: 500,
         decorations: false,
         transparent: true,
         shadow: false,

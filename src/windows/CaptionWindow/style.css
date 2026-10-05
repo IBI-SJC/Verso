@@ -1,11 +1,18 @@
 html, body {
     margin: 0;
     padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#root {
+    margin-top: auto;
 }
 
 .caption-outer {
     width: 100vw;
-    height: 100vh;
+    height: fit-content;
     background-color: transparent;
     display: flex;
     align-items: center;
@@ -22,6 +29,7 @@ html, body {
     width: calc(100% - 60px);
     height: calc(100% - 50px);
     border: 4px solid rgb(111 169 222);
+    margin: 25px 0;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -38,16 +46,33 @@ html, body {
 }
 
 .verse-text {
-    text-align: justify;
-    font-size: 30px;
-    font-family: Georgia, 'Times New Roman', Times, serif;
-    width: 80%;
+    margin: 20px 0;
+    font-size: 35px;
+    line-height: 80%;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    width: 90%;
+}
+
+/* 1. The outer wrapper handles centering the single-line box */
+.text-container {
+  text-align: center; 
+  width: 100%;       /* Ensures the container spans full width */
+}
+
+/* 2. The inner element handles the text justification */
+.dynamic-text {
+  display: inline-block;
+  text-align: justify;
+  max-width: 1200px;   /* The point where the text will begin wrapping into multiple lines */
+  margin: 0;          /* Removes default paragraph spacing if needed */
 }
 
 .verse-address {
     text-align: center;
     font-size: large;
     margin-top: 8px;
+    font-size: 25px;
+    font-family:'Franklin Gothic', 'Arial Narrow', Arial, sans-serif
 }
 
 html, body, #root {
