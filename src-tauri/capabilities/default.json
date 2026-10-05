@@ -5,10 +5,12 @@
   "windows": ["main", "caption-window"],
   "permissions": [
     "core:default",
-    "opener:default",
+    "core:event:allow-listen",
     "core:webview:allow-create-webview-window",
     "core:window:allow-close",
-    "core:event:allow-listen",
-    "core:window:allow-destroy"
+    "core:window:allow-destroy",
+    "core:window:allow-minimize",
+    "core:window:allow-set-always-on-bottom",
+    "opener:default"
   ]
 }
