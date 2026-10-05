@@ -1,4 +1,3 @@
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./style.css"
 import { useAppState } from "../../contexts/VerseReferenceContext";
@@ -6,12 +5,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import searchVerse from "../../utils/searchVerse";
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { Bible, VerseReference } from "../../types";
-import { ABBR_TO_BOOK, CAPTION_WINDOW } from "../../constants";
+import { ABBR_TO_BOOK } from "../../constants";
 import { invoke } from "@tauri-apps/api/core";
 import getAdjacentVerse from "../../utils/getAdjacentVerse";
 import ACF from "../../acf.json"
 import getVerseByReference from "../../utils/getVerseByReference";
 import ensureCaptionWindow from "../../utils/ensureCaptionWindow";
+import closeApplication from "../../utils/closeApplication";
 
 function formatReferenceQuery(ref: VerseReference) {
   return `${ABBR_TO_BOOK[ref.book]} ${ref.chapter}:${ref.verse}`;
@@ -29,14 +29,10 @@ export default function ControlWindow() {
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
   const isEnsuringCaptionWindow = useRef(false);
-  // Evita reentrância: se o handler de close for chamado de novo
-  // enquanto já estamos fechando, não tentamos fechar a legenda 2x.
   const isClosingApp = useRef(false);
 
   const isPaused = reference === null && pausedReference !== null;
 
-  // Ao fechar a janela principal, fecha também a de legenda antes de
-  // permitir que o processo/app termine.
   useEffect(() => {
     inputRef.current?.focus();
 
@@ -45,27 +41,11 @@ export default function ControlWindow() {
     const mainWindow = getCurrentWindow();
     let unlisten: (() => void) | undefined;
 
-    mainWindow.onCloseRequested(async (event) => {
-      if (isClosingApp.current) {
-        return;
-      }
-      isClosingApp.current = true;
-
-      // Impede o fechamento imediato da principal para dar tempo
-      // de fechar a legenda de forma coordenada.
-      event.preventDefault();
-
-      try {
-        const captionWindow = await WebviewWindow.getByLabel(CAPTION_WINDOW);
-        if (captionWindow) {
-          await captionWindow.close();
-        }
-      } catch (e) {
-        console.error('Erro ao fechar janela de legenda:', e);
-      } finally {
-        await mainWindow.destroy();
-      }
-    }).then((fn) => {
+    mainWindow.onCloseRequested(async (event) => closeApplication(
+      mainWindow,
+      event,
+      isClosingApp,
+    )).then((fn) => {
       unlisten = fn;
     });
 
